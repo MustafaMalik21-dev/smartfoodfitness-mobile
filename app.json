@@ -13,17 +13,61 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mustafa.smartfoodfitness",
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to scan and identify food for calorie tracking.",
+        "NSPhotoLibraryUsageDescription": "Used to select food photos for calorie tracking.",
+        "NSBluetoothAlwaysUsageDescription": "Used to connect to your smart scale and read body measurements.",
+        "NSBluetoothPeripheralUsageDescription": "Used to connect to your smart scale and read body measurements.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthShareUsageDescription": "SmartFoodFitness reads steps, heart rate and calories burned from Apple Health to display your fitness activity.",
+        "NSHealthUpdateUsageDescription": "SmartFoodFitness may write workout data to Apple Health."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.mustafa.smartfoodfitness",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-dev-client",
+      "react-native-ble-plx",
+      "expo-font",
+      [
+        "react-native-health",
+        {
+          "NSHealthShareUsageDescription": "SmartFoodFitness reads steps, heart rate and calories burned from Apple Health to display your fitness activity.",
+          "NSHealthUpdateUsageDescription": "SmartFoodFitness may write workout data to Apple Health."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "176657f7-9fb4-498d-80a6-1e2448d52a87"
+      }
+    },
+    "owner": "mustafamalik"
   }
 }
