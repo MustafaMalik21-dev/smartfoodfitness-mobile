@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import TourTarget from "../../tour/TourTarget";
 import { useTour } from "../../tour/TourContext";
@@ -33,6 +33,25 @@ const MICRO_COLORS = {
   vitaminC:     "#22c55e",
   vitaminD:     "#8b5cf6",
 };
+
+// ── Curated popular foods (clean, unbranded, USDA-based per-100g values) ────
+const CURATED_POPULAR = [
+  { fdcId: "c-egg-whole",      name: "Egg, Whole",             kcalPer100g: 143, proteinPer100g: 12.6, carbsPer100g: 0.7,  fatPer100g: 9.5,  sodiumPer100g: 142, cholesterolPer100g: 373, saturatedFatPer100g: 3.1, isCurated: true },
+  { fdcId: "c-egg-white",      name: "Egg White",              kcalPer100g: 52,  proteinPer100g: 10.9, carbsPer100g: 0.7,  fatPer100g: 0.2,  sodiumPer100g: 166, isCurated: true },
+  { fdcId: "c-chicken-breast", name: "Chicken Breast",         kcalPer100g: 165, proteinPer100g: 31.0, carbsPer100g: 0,    fatPer100g: 3.6,  sodiumPer100g: 74,  cholesterolPer100g: 85,  saturatedFatPer100g: 1.0, isCurated: true },
+  { fdcId: "c-chicken-thigh",  name: "Chicken Thigh",          kcalPer100g: 209, proteinPer100g: 25.9, carbsPer100g: 0,    fatPer100g: 10.9, sodiumPer100g: 84,  cholesterolPer100g: 93,  saturatedFatPer100g: 2.9, isCurated: true },
+  { fdcId: "c-beef-sirloin",   name: "Beef, Sirloin Steak",    kcalPer100g: 207, proteinPer100g: 26.1, carbsPer100g: 0,    fatPer100g: 10.6, sodiumPer100g: 56,  cholesterolPer100g: 83,  saturatedFatPer100g: 4.1, isCurated: true },
+  { fdcId: "c-beef-ribeye",    name: "Beef, Ribeye Steak",     kcalPer100g: 291, proteinPer100g: 22.4, carbsPer100g: 0,    fatPer100g: 21.6, sodiumPer100g: 57,  cholesterolPer100g: 80,  saturatedFatPer100g: 9.0, isCurated: true },
+  { fdcId: "c-rice-white",     name: "Rice, White (Cooked)",   kcalPer100g: 130, proteinPer100g: 2.7,  carbsPer100g: 28.2, fatPer100g: 0.3,  fiberPer100g: 0.4,  sodiumPer100g: 1, isCurated: true },
+  { fdcId: "c-rice-brown",     name: "Rice, Brown (Cooked)",   kcalPer100g: 122, proteinPer100g: 2.3,  carbsPer100g: 25.6, fatPer100g: 0.9,  fiberPer100g: 1.8,  sodiumPer100g: 2, isCurated: true },
+  { fdcId: "c-salmon",         name: "Salmon, Atlantic",       kcalPer100g: 208, proteinPer100g: 20.4, carbsPer100g: 0,    fatPer100g: 13.4, sodiumPer100g: 59,  cholesterolPer100g: 63,  saturatedFatPer100g: 3.1, potassiumPer100g: 490, isCurated: true },
+  { fdcId: "c-tuna",           name: "Tuna, Canned in Water",  kcalPer100g: 116, proteinPer100g: 25.5, carbsPer100g: 0,    fatPer100g: 1.0,  sodiumPer100g: 337, cholesterolPer100g: 50, isCurated: true },
+  { fdcId: "c-oats",           name: "Oats, Rolled",           kcalPer100g: 389, proteinPer100g: 16.9, carbsPer100g: 66.3, fatPer100g: 6.9,  fiberPer100g: 10.6, sodiumPer100g: 2, isCurated: true },
+  { fdcId: "c-banana",         name: "Banana",                 kcalPer100g: 89,  proteinPer100g: 1.1,  carbsPer100g: 22.8, fatPer100g: 0.3,  fiberPer100g: 2.6,  sugarPer100g: 12.2, potassiumPer100g: 358, isCurated: true },
+  { fdcId: "c-sweet-potato",   name: "Sweet Potato (Cooked)",  kcalPer100g: 86,  proteinPer100g: 1.6,  carbsPer100g: 20.1, fatPer100g: 0.1,  fiberPer100g: 3.0,  sugarPer100g: 4.2, potassiumPer100g: 337, vitaminAPer100g: 961, isCurated: true },
+  { fdcId: "c-broccoli",       name: "Broccoli",               kcalPer100g: 34,  proteinPer100g: 2.8,  carbsPer100g: 7.0,  fatPer100g: 0.4,  fiberPer100g: 2.6,  vitaminCPer100g: 89.2, potassiumPer100g: 316, isCurated: true },
+  { fdcId: "c-greek-yogurt",   name: "Greek Yogurt, Plain",    kcalPer100g: 59,  proteinPer100g: 10.2, carbsPer100g: 3.6,  fatPer100g: 0.4,  sugarPer100g: 3.2,  calciumPer100g: 111, sodiumPer100g: 36, isCurated: true },
+];
 
 function n(v) {
   const x = Number(v);
@@ -139,14 +158,50 @@ export default function LogFoodScreen({ navigation, route }) {
       try {
         let next = [];
         if (query) {
+          // Search: fetch from API, sort non-branded (Foundation/SR Legacy) first
           const res = await apiClient.get("/api/food-database/search", { params: { q: query, limit: 25 } });
-          next = res?.data?.items || [];
+          const raw = res?.data?.items || [];
+          next = [...raw].sort((a, b) => (a.brand ? 1 : 0) - (b.brand ? 1 : 0));
         } else {
-          const POPULAR_TERMS = ["egg", "rice", "salmon", "beef", "banana", "oats", "avocado", "yogurt", "bread", "broccoli"];
-          const results = await Promise.all(
-            POPULAR_TERMS.map(t => apiClient.get("/api/food-database/search", { params: { q: t, limit: 3 } }).catch(() => ({ data: { items: [] } })))
-          );
-          next = results.flatMap(r => r?.data?.items || []);
+          // No search: user's most-logged foods first, then curated staples
+          let freqItems = [];
+          if (userId) {
+            try {
+              const res = await apiClient.get(`/api/food-entry-logs/user/${userId}`);
+              const list = Array.isArray(res.data) ? res.data : [];
+              // Group by food name, count frequency
+              const grouped = {};
+              list.forEach(entry => {
+                const name = entry.foodName;
+                if (!name) return;
+                if (!grouped[name]) grouped[name] = { count: 0, entries: [] };
+                grouped[name].count++;
+                grouped[name].entries.push(entry);
+              });
+              // Top 5 most logged — derive per-100g nutrition from their latest log entry
+              freqItems = Object.entries(grouped)
+                .sort(([, a], [, b]) => b.count - a.count)
+                .slice(0, 5)
+                .map(([name, { count, entries }]) => {
+                  const latest = entries[entries.length - 1];
+                  const w = clampNonNeg(latest.weightValue) || 100;
+                  return {
+                    fdcId: `freq-${name}`,
+                    name,
+                    isUserFrequency: true,
+                    count,
+                    kcalPer100g:    w > 0 ? (clampNonNeg(latest.calories) / w) * 100 : 0,
+                    proteinPer100g: w > 0 ? (clampNonNeg(latest.proteins) / w) * 100 : 0,
+                    carbsPer100g:   w > 0 ? (clampNonNeg(latest.carbs)    / w) * 100 : 0,
+                    fatPer100g:     w > 0 ? (clampNonNeg(latest.fats)     / w) * 100 : 0,
+                  };
+                });
+            } catch { /* no history yet — show curated only */ }
+          }
+          // Curated list, skip any names the user already has in their freq list
+          const freqNames = new Set(freqItems.map(r => r.name.toLowerCase()));
+          const curatedItems = CURATED_POPULAR.filter(f => !freqNames.has(f.name.toLowerCase()));
+          next = [...freqItems, ...curatedItems];
         }
         if (!cancelled) setItems(next);
       } catch {
@@ -158,7 +213,7 @@ export default function LogFoodScreen({ navigation, route }) {
     if (tab === "Popular") runPopular();
     else setItems([]);
     return () => { cancelled = true; };
-  }, [query, tab]);
+  }, [query, tab, userId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -230,6 +285,9 @@ export default function LogFoodScreen({ navigation, route }) {
     return items.map((x) => ({
       fdcId: x.fdcId,
       name: x.brand ? `${x.name} (${x.brand})` : x.name,
+      isUserFrequency: x.isUserFrequency || false,
+      isCurated: x.isCurated || false,
+      count: x.count,
       per100: {
         kcal: x.kcalPer100g, p: x.proteinPer100g, c: x.carbsPer100g, f: x.fatPer100g,
         fiber: x.fiberPer100g, sugar: x.sugarPer100g, sodium: x.sodiumPer100g,
@@ -441,10 +499,14 @@ export default function LogFoodScreen({ navigation, route }) {
           <Text style={s.empty}>{tab === "Popular" ? "No results" : "No recent foods yet"}</Text>
         ) : null}
 
-        {!isLoading && displayRows.map((x) => {
+        {!isLoading && displayRows.map((x, idx) => {
           const rowKey = tab === "Popular" ? String(x.fdcId || x.name) : x.key;
           const isOpen = expandedFoodKey === rowKey;
           const isPopular = tab === "Popular";
+          const prevX = idx > 0 ? displayRows[idx - 1] : null;
+          const hasFreqItems = isPopular && displayRows.some(r => r.isUserFrequency);
+          const showFreqHeader = isPopular && x.isUserFrequency && !prevX?.isUserFrequency;
+          const showCuratedHeader = isPopular && x.isCurated && !prevX?.isCurated && hasFreqItems;
           const p = isPopular ? x.per100 : x.per100Derived;
           const servingLabel = isPopular ? "per 100g" : `per ${x.grams || 100}g`;
 
@@ -473,7 +535,10 @@ export default function LogFoodScreen({ navigation, route }) {
           ].filter(([, v]) => v != null && Number(v) > 0);
 
           return (
-            <View key={rowKey} style={s.rowWrap}>
+            <Fragment key={rowKey}>
+              {showFreqHeader && <Text style={s.sectionHeader}>Your Favourites</Text>}
+              {showCuratedHeader && <Text style={s.sectionHeader}>Popular Foods</Text>}
+              <View style={s.rowWrap}>
               <TouchableOpacity
                 style={s.row}
                 onPress={() => setExpandedFoodKey(isOpen ? null : rowKey)}
@@ -481,6 +546,12 @@ export default function LogFoodScreen({ navigation, route }) {
               >
                 <View style={{ flex: 2 }}>
                   <Text style={s.rowName} numberOfLines={2}>{x.name}</Text>
+                  {isPopular && x.isUserFrequency && x.count > 0 && (
+                    <View style={s.freqBadge}>
+                      <Ionicons name="flame" size={11} color="#f97316" />
+                      <Text style={s.freqBadgeText}>{x.count}× logged</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={s.rowMeta}>{isPopular ? "100g" : x.grams ? `${x.grams}g` : "—"}</Text>
                 <Text style={s.rowKcal}>{isPopular ? (roundInt(p?.kcal) || "—") : (x.kcal || "—")}</Text>
@@ -519,7 +590,8 @@ export default function LogFoodScreen({ navigation, route }) {
                   )}
                 </View>
               )}
-            </View>
+              </View>
+            </Fragment>
           );
         })}
       </ScrollView>
@@ -761,6 +833,9 @@ function makeStyles(colors) {
     body: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xs },
     errText: { color: colors.error, fontSize: font.sm, textAlign: "center", marginVertical: spacing.sm },
     empty: { color: colors.textSecondary, textAlign: "center", marginVertical: spacing.xl, fontSize: font.sm },
+    sectionHeader: { fontSize: 11, fontWeight: "700", color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.8, paddingTop: spacing.md, paddingBottom: spacing.xs },
+    freqBadge: { flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "#f9731618", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, alignSelf: "flex-start", marginTop: 3 },
+    freqBadgeText: { fontSize: 10, fontWeight: "700", color: "#f97316" },
     rowWrap: { backgroundColor: colors.surface, borderRadius: radius.lg, marginBottom: spacing.sm, shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1, overflow: "hidden" },
     row: { flexDirection: "row", alignItems: "center", padding: spacing.md, gap: spacing.sm },
     rowName: { fontSize: font.sm, color: colors.text, fontWeight: font.semiBold },
