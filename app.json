@@ -68,6 +68,12 @@
         "projectId": "176657f7-9fb4-498d-80a6-1e2448d52a87"
       }
     },
-    "owner": "mustafamalik"
+    "owner": "mustafamalik",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/176657f7-9fb4-498d-80a6-1e2448d52a87"
+    }
   }
 }
