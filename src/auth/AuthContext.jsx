@@ -1,4 +1,5 @@
 import { createContext, useEffect, useMemo, useState } from "react";
+import { DeviceEventEmitter } from "react-native";
 import apiClient from "../api/apiClient";
 import { clearAuth, getAuth, setAuth as persistAuth, setMemoryCache } from "./authStorage";
 
@@ -31,6 +32,14 @@ export function AuthProvider({ children }) {
       }
       setBootstrapped(true);
     });
+  }, []);
+
+  // When a 401 is received anywhere in the app, auto-logout cleanly
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener("sff_auth_expired", () => {
+      setAuthState(null);
+    });
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
