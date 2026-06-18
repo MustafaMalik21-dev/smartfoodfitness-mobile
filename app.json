@@ -45,7 +45,10 @@
         "android.permission.BLUETOOTH_SCAN",
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_HEART_RATE"
       ]
     },
     "web": {
@@ -62,7 +65,8 @@
           "NSHealthShareUsageDescription": "SmartFoodFitness reads steps, heart rate and calories burned from Apple Health to display your fitness activity.",
           "NSHealthUpdateUsageDescription": "SmartFoodFitness may write workout data to Apple Health."
         }
-      ]
+      ],
+      "react-native-health-connect"
     ],
     "extra": {
       "eas": {

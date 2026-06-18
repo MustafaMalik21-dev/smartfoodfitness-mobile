@@ -14,11 +14,11 @@ import { font, radius, spacing } from "../../theme";
 import TourTarget from "../../tour/TourTarget";
 import { useTour } from "../../tour/TourContext";
 import {
-  HK_AVAILABLE,
+  HEALTH_AVAILABLE,
   getTodaySteps,
   getTodayCalories,
   getLatestHeartRate,
-} from "../../utils/HealthKitService";
+} from "../../utils/HealthService";
 
 const STEP_GOAL = 10000;
 
@@ -125,7 +125,7 @@ export default function FitnessScreen({ navigation }) {
   const [hkHR, setHkHR]             = useState(null); // { value, date } | null
 
   const loadActivity = useCallback(async () => {
-    if (!HK_AVAILABLE) return;
+    if (!HEALTH_AVAILABLE) return;
     const [steps, cals, hr] = await Promise.all([
       getTodaySteps(),
       getTodayCalories(),
@@ -235,7 +235,7 @@ export default function FitnessScreen({ navigation }) {
 
         {/* Today's Activity */}
         <TourTarget tourKey="fitness_activity">
-        {HK_AVAILABLE && (
+        {HEALTH_AVAILABLE && (
           <TouchableOpacity style={s.activityCard} onPress={() => navigation.navigate("ActivityTracking")} activeOpacity={0.8}>
             <View style={s.activityCardHeader}>
               <View style={s.activityCardLeft}>

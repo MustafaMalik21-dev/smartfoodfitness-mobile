@@ -40,10 +40,10 @@ import { useTour } from "../../tour/TourContext";
 import NotificationBell from "../../components/NotificationBell";
 import ProfileButton from "../../components/ProfileButton";
 import {
-  HK_AVAILABLE,
+  HEALTH_AVAILABLE,
   getTodaySteps,
   getTodayCalories,
-} from "../../utils/HealthKitService";
+} from "../../utils/HealthService";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STEP_GOAL     = 10000;
@@ -112,8 +112,8 @@ const DEFAULT_ACTIONS = ["logFood", "workout", "findRecipes"];
 // ─── Widget catalogue ─────────────────────────────────────────────────────────
 const ALL_WIDGETS = [
   { id: "quickActions",   title: "Quick Actions",    desc: "Up to 5 customisable shortcuts",          icon: "flash-outline",       color: "#6366f1" },
-  { id: "caloriesBurned", title: "Calories Burned",  desc: "Active kcal burned today via Apple Watch", icon: "flame-outline",       color: "#ef4444", requiresHK: true },
-  { id: "steps",          title: "Step Tracker",     desc: "Today's steps from Apple Health",          icon: "footsteps-outline",   color: "#22c55e", requiresHK: true },
+  { id: "caloriesBurned", title: "Calories Burned",  desc: "Active kcal burned today via your health app", icon: "flame-outline",       color: "#ef4444", requiresHealth: true },
+  { id: "steps",          title: "Step Tracker",     desc: "Today's steps from your health app",           icon: "footsteps-outline",   color: "#22c55e", requiresHealth: true },
   { id: "water",          title: "Water Tracker",    desc: "Quick-log daily water intake",             icon: "water-outline",       color: "#0ea5e9" },
   { id: "activityStats",  title: "Activity Stats",   desc: "Total workout time and weekly frequency",  icon: "analytics-outline",   color: "#f97316" },
   { id: "weeklyInsight",  title: "Weekly Insight",   desc: "AI-powered summary of your progress",      icon: "sparkles-outline",    color: "#8b5cf6" },
@@ -297,8 +297,12 @@ function CaloriesBurnedWidget({ todayCalsBurned, navigation, s, colors }) {
         </>
       ) : (
         <View style={s.unavailBox}>
-          <Ionicons name="watch-outline" size={26} color={colors.textLight} />
-          <Text style={s.unavailText}>Sync an Apple Watch to see calories burned</Text>
+          <Ionicons name="fitness-outline" size={26} color={colors.textLight} />
+          <Text style={s.unavailText}>
+            {Platform.OS === "android"
+              ? "Connect Health Connect to see calories burned"
+              : "Sync an Apple Watch to see calories burned"}
+          </Text>
         </View>
       )}
     </TouchableOpacity>
@@ -337,8 +341,12 @@ function StepsWidget({ todaySteps, navigation, s, colors }) {
         </>
       ) : (
         <View style={s.unavailBox}>
-          <Ionicons name="watch-outline" size={26} color={colors.textLight} />
-          <Text style={s.unavailText}>Sync an Apple Watch to see your steps</Text>
+          <Ionicons name="fitness-outline" size={26} color={colors.textLight} />
+          <Text style={s.unavailText}>
+            {Platform.OS === "android"
+              ? "Connect Health Connect to see your steps"
+              : "Sync an Apple Watch to see your steps"}
+          </Text>
         </View>
       )}
     </TouchableOpacity>
@@ -635,7 +643,7 @@ export default function DashboardScreen({ navigation }) {
 
   // ── HealthKit ──────────────────────────────────────────────────────────────
   const loadHK = useCallback(async () => {
-    if (!HK_AVAILABLE) return;
+    if (!HEALTH_AVAILABLE) return;
     const [steps, cals] = await Promise.all([getTodaySteps(), getTodayCalories()]);
     setTodaySteps(steps);
     setTodayCalsBurned(cals);
@@ -948,7 +956,7 @@ export default function DashboardScreen({ navigation }) {
                   <Text style={s.addPanelEmpty}>All widgets are already on your dashboard.</Text>
                 ) : (
                   availableToAdd.map((w, i) => {
-                    const locked = w.requiresHK && !HK_AVAILABLE;
+                    const locked = w.requiresHealth && !HEALTH_AVAILABLE;
                     return (
                       <View
                         key={w.id}
@@ -963,7 +971,7 @@ export default function DashboardScreen({ navigation }) {
                         </View>
                         <View style={s.addPanelMeta}>
                           <Text style={s.addPanelName}>{w.title}</Text>
-                          <Text style={s.addPanelDesc}>{locked ? "Requires Apple Watch" : w.desc}</Text>
+                          <Text style={s.addPanelDesc}>{locked ? "Requires a health app" : w.desc}</Text>
                         </View>
                         {locked
                           ? <Ionicons name="lock-closed-outline" size={16} color={colors.textLight} />

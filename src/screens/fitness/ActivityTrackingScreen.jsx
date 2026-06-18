@@ -10,15 +10,18 @@ import {
   Svg, Path, Circle as SvgCircle, G, Defs, LinearGradient, Stop,
   Line as SvgLine, Rect as SvgRect, Text as SvgText,
 } from "react-native-svg";
-import { Linking } from "react-native";
+import { Linking, Platform } from "react-native";
 import {
-  HK_AVAILABLE,
-  initHealthKit,
-  getHKStatus,
+  HEALTH_AVAILABLE,
+  initHealth,
+  getHealthStatus,
+  resetHealthInit,
+  openHealthSettings,
+  openHealthConnectInstall,
   getDailySteps,
   getDailyCalories,
   getHeartRateSamples,
-} from "../../utils/HealthKitService";
+} from "../../utils/HealthService";
 import { useTheme } from "../../ThemeContext";
 import { font, radius, spacing } from "../../theme";
 
@@ -29,6 +32,8 @@ const MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","D
 
 const STEP_GOAL = 10000; // daily step goal
 
+const isAndroid = Platform.OS === "android";
+
 const METRICS = [
   {
     key: "steps",
@@ -36,7 +41,9 @@ const METRICS = [
     unit: "steps",
     color: "#22c55e",
     icon: "footsteps-outline",
-    desc: "Daily step count from your iPhone & Apple Watch",
+    desc: isAndroid
+      ? "Daily step count from your phone & wearable via Health Connect"
+      : "Daily step count from your iPhone & Apple Watch",
     chartType: "bar",
   },
   {
@@ -54,7 +61,9 @@ const METRICS = [
     unit: "bpm",
     color: "#ef4444",
     icon: "heart-outline",
-    desc: "Heart rate readings recorded by your Apple Watch",
+    desc: isAndroid
+      ? "Heart rate readings from Health Connect"
+      : "Heart rate readings recorded by your Apple Watch",
     chartType: "line",
   },
 ];
@@ -365,8 +374,10 @@ export default function ActivityTrackingScreen({ navigation }) {
 
   const [loading,     setLoading]     = useState(true);
   const [err,         setErr]         = useState("");
-  // "idle" | "requesting" | "granted" | "denied"
-  const [hkStatus,    setHkStatus]    = useState(() => HK_AVAILABLE ? getHKStatus() : "unavailable");
+  // "idle" | "requesting" | "granted" | "denied" | "sdk_unavailable" | "unavailable"
+  const [healthStatus, setHealthStatus] = useState(
+    () => HEALTH_AVAILABLE ? getHealthStatus() : "unavailable"
+  );
 
   // Raw data stores
   const [stepsData,   setStepsData]   = useState([]);
@@ -378,23 +389,32 @@ export default function ActivityTrackingScreen({ navigation }) {
   const [todayCals,   setTodayCals]   = useState(null);
   const [latestHR,    setLatestHR]    = useState(null);
 
-  // Request HealthKit permissions explicitly
+  // Request permissions explicitly (called from "Grant Access" / "Try Again" buttons)
   const requestPermissions = useCallback(async () => {
-    if (!HK_AVAILABLE) return;
-    setHkStatus("requesting");
-    const granted = await initHealthKit();
-    setHkStatus(granted ? "granted" : "denied");
+    if (!HEALTH_AVAILABLE) return;
+    resetHealthInit(); // clear cached promise so we can prompt again
+    setHealthStatus("requesting");
+    const granted = await initHealth();
+    setHealthStatus(getHealthStatus());
     if (granted) load();
   }, []);
 
   const load = useCallback(async () => {
-    if (!HK_AVAILABLE) { setLoading(false); return; }
-    // Auto-init on first load — triggers iOS permission dialog if not yet shown
-    const status = getHKStatus();
+    if (!HEALTH_AVAILABLE) { setLoading(false); return; }
+    const status = getHealthStatus();
+
     if (status === "idle") {
-      setHkStatus("requesting");
-      const granted = await initHealthKit();
-      setHkStatus(granted ? "granted" : "denied");
+      // First launch — auto-request permissions
+      setHealthStatus("requesting");
+      const granted = await initHealth();
+      setHealthStatus(getHealthStatus());
+      if (!granted) { setLoading(false); return; }
+    } else if (status === "sdk_unavailable") {
+      // Health Connect might have been installed since last check — re-try
+      resetHealthInit();
+      setHealthStatus("requesting");
+      const granted = await initHealth();
+      setHealthStatus(getHealthStatus());
       if (!granted) { setLoading(false); return; }
     } else if (status === "denied") {
       setLoading(false); return;
@@ -452,8 +472,8 @@ export default function ActivityTrackingScreen({ navigation }) {
 
   const s = useMemo(() => makeStyles(colors), [colors]);
 
-  // ── HealthKit unavailable (non-iOS or module missing) ────────────────────────
-  if (!HK_AVAILABLE) {
+  // ── Health module unavailable (web or unsupported platform) ─────────────────
+  if (!HEALTH_AVAILABLE) {
     return (
       <SafeAreaView style={s.screen} edges={["top"]}>
         <View style={s.header}>
@@ -465,18 +485,23 @@ export default function ActivityTrackingScreen({ navigation }) {
         </View>
         <View style={s.unavailWrap}>
           <Ionicons name="watch-outline" size={52} color={colors.textLight} />
-          <Text style={s.unavailTitle}>HealthKit Not Available</Text>
+          <Text style={s.unavailTitle}>Activity Tracking Unavailable</Text>
           <Text style={s.unavailSub}>
-            Activity tracking requires a custom development build on a physical iOS device.
-            It reads data from your iPhone and paired Apple Watch automatically.
+            Activity tracking requires a native build on a physical device. It reads data from
+            Apple Health (iOS) or Health Connect (Android) automatically.
           </Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // ── Permissions not yet granted ───────────────────────────────────────────────
-  if (hkStatus === "idle" || hkStatus === "requesting" || hkStatus === "denied") {
+  // ── Permissions / Health Connect install needed ──────────────────────────────
+  if (
+    healthStatus === "idle"         ||
+    healthStatus === "requesting"   ||
+    healthStatus === "denied"       ||
+    healthStatus === "sdk_unavailable"
+  ) {
     return (
       <SafeAreaView style={s.screen} edges={["top"]}>
         <View style={s.header}>
@@ -487,37 +512,62 @@ export default function ActivityTrackingScreen({ navigation }) {
           <View style={{ width: 40 }} />
         </View>
         <View style={s.unavailWrap}>
-          {hkStatus === "requesting" ? (
+          {healthStatus === "requesting" ? (
             <>
               <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 16 }} />
               <Text style={s.unavailTitle}>Requesting Access…</Text>
               <Text style={s.unavailSub}>
-                Please allow access to Apple Health when the system prompt appears.
+                {isAndroid
+                  ? "Please allow access in the Health Connect screen that just opened."
+                  : "Please allow access to Apple Health when the system prompt appears."}
               </Text>
             </>
-          ) : hkStatus === "denied" ? (
+          ) : healthStatus === "sdk_unavailable" ? (
+            <>
+              <Ionicons name="fitness-outline" size={52} color={colors.textLight} />
+              <Text style={s.unavailTitle}>Health Connect Required</Text>
+              <Text style={s.unavailSub}>
+                SmartFoodFitness uses Health Connect to read your steps, calories, and heart rate.
+                It's a free Google app — install it, then come back and open this screen again.
+              </Text>
+              <TouchableOpacity style={s.permBtn} onPress={openHealthConnectInstall}>
+                <Ionicons name="download-outline" size={16} color="#fff" />
+                <Text style={s.permBtnText}>Get Health Connect</Text>
+              </TouchableOpacity>
+            </>
+          ) : healthStatus === "denied" ? (
             <>
               <Ionicons name="lock-closed-outline" size={52} color={colors.textLight} />
               <Text style={s.unavailTitle}>Health Access Denied</Text>
               <Text style={s.unavailSub}>
-                SmartFoodFitness needs access to your Health data to show steps, calories burned,
-                and heart rate. Please enable it in Settings.
+                {isAndroid
+                  ? "SmartFoodFitness needs permission to read your steps, calories, and heart rate. Open Health Connect settings to grant access."
+                  : "SmartFoodFitness needs access to your Health data to show steps, calories burned, and heart rate. Please enable it in Settings."}
               </Text>
-              <TouchableOpacity
-                style={s.permBtn}
-                onPress={() => Linking.openURL("app-settings:")}
-              >
+              <TouchableOpacity style={s.permBtn} onPress={openHealthSettings}>
                 <Ionicons name="settings-outline" size={16} color="#fff" />
-                <Text style={s.permBtnText}>Open Settings</Text>
+                <Text style={s.permBtnText}>
+                  {isAndroid ? "Open Health Connect" : "Open Settings"}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.permBtnSecondary} onPress={requestPermissions}>
+                <Text style={[s.permBtnText, { color: colors.primary }]}>Try Again</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <Ionicons name="heart-outline" size={52} color={colors.primary} />
-              <Text style={s.unavailTitle}>Connect Apple Health</Text>
+              <Ionicons
+                name={isAndroid ? "fitness-outline" : "heart-outline"}
+                size={52}
+                color={colors.primary}
+              />
+              <Text style={s.unavailTitle}>
+                {isAndroid ? "Connect Health Connect" : "Connect Apple Health"}
+              </Text>
               <Text style={s.unavailSub}>
-                Allow SmartFoodFitness to read your steps, active calories, and heart rate from
-                Apple Health. Your data stays on your device.
+                {isAndroid
+                  ? "Allow SmartFoodFitness to read your steps, active calories, and heart rate from Health Connect. Works with Samsung Health, Google Fit, Fitbit, and more."
+                  : "Allow SmartFoodFitness to read your steps, active calories, and heart rate from Apple Health. Your data stays on your device."}
               </Text>
               <TouchableOpacity style={s.permBtn} onPress={requestPermissions}>
                 <Ionicons name="checkmark-circle-outline" size={16} color="#fff" />
@@ -679,7 +729,9 @@ export default function ActivityTrackingScreen({ navigation }) {
               <Ionicons name={activeMeta.icon} size={32} color={colors.textSecondary} />
               <Text style={s.emptyText}>No {activeMeta.label} data yet</Text>
               <Text style={s.emptySub}>
-                Make sure your Apple Watch is paired and Health permissions are granted.
+                {isAndroid
+                  ? "Make sure your health app (Samsung Health, Google Fit, etc.) is synced to Health Connect."
+                  : "Make sure your Apple Watch is paired and Health permissions are granted."}
               </Text>
             </View>
           )}
@@ -712,6 +764,11 @@ function makeStyles(colors) {
       flexDirection: "row", alignItems: "center", gap: 8,
       backgroundColor: colors.primary, borderRadius: radius.lg,
       paddingHorizontal: spacing.xl, paddingVertical: 14, marginTop: spacing.sm,
+    },
+    permBtnSecondary: {
+      flexDirection: "row", alignItems: "center", gap: 8,
+      borderRadius: radius.lg,
+      paddingHorizontal: spacing.xl, paddingVertical: 14, marginTop: spacing.xs,
     },
     permBtnText: { color: "#fff", fontSize: font.base, fontWeight: "700" },
 
