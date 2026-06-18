@@ -82,6 +82,8 @@ function xNav(n, tab, screen) {
 const ALL_ACTIONS = [
   { id: "logFood",          label: "Log Food",    icon: "restaurant-outline",  color: "#f97316",
     nav: (n) => xNav(n, "Food", "LogFood") },
+  { id: "scanBarcode",      label: "Scan Food",   icon: "barcode-outline",     color: "#0b84ff",
+    nav: (n) => xNav(n, "Food", "FoodCamera") },
   { id: "workout",          label: "Workout",     icon: "barbell-outline",     color: "#22c55e",
     nav: (n) => xNav(n, "Fitness", "Workout") },
   { id: "findRecipes",      label: "Recipes",     icon: "book-outline",        color: "#f59e0b",

@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from "react-native";
 import TourTarget from "../../tour/TourTarget";
 import { useTour } from "../../tour/TourContext";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -163,45 +163,48 @@ export default function LogFoodScreen({ navigation, route }) {
           const raw = res?.data?.items || [];
           next = [...raw].sort((a, b) => (a.brand ? 1 : 0) - (b.brand ? 1 : 0));
         } else {
-          // No search: user's most-logged foods first, then curated staples
-          let freqItems = [];
+          // No search: reorder curated list based on user's macro profile + food name overlap
+          let sortedCurated = [...CURATED_POPULAR];
           if (userId) {
             try {
               const res = await apiClient.get(`/api/food-entry-logs/user/${userId}`);
               const list = Array.isArray(res.data) ? res.data : [];
-              // Group by food name, count frequency
-              const grouped = {};
-              list.forEach(entry => {
-                const name = entry.foodName;
-                if (!name) return;
-                if (!grouped[name]) grouped[name] = { count: 0, entries: [] };
-                grouped[name].count++;
-                grouped[name].entries.push(entry);
-              });
-              // Top 5 most logged — derive per-100g nutrition from their latest log entry
-              freqItems = Object.entries(grouped)
-                .sort(([, a], [, b]) => b.count - a.count)
-                .slice(0, 5)
-                .map(([name, { count, entries }]) => {
-                  const latest = entries[entries.length - 1];
-                  const w = clampNonNeg(latest.weightValue) || 100;
-                  return {
-                    fdcId: `freq-${name}`,
-                    name,
-                    isUserFrequency: true,
-                    count,
-                    kcalPer100g:    w > 0 ? (clampNonNeg(latest.calories) / w) * 100 : 0,
-                    proteinPer100g: w > 0 ? (clampNonNeg(latest.proteins) / w) * 100 : 0,
-                    carbsPer100g:   w > 0 ? (clampNonNeg(latest.carbs)    / w) * 100 : 0,
-                    fatPer100g:     w > 0 ? (clampNonNeg(latest.fats)     / w) * 100 : 0,
-                  };
+              if (list.length >= 3) {
+                // Compute user's overall macro balance from logged history
+                let totalP = 0, totalC = 0, totalF = 0;
+                const userFoodNames = [];
+                list.forEach(entry => {
+                  totalP += clampNonNeg(entry.proteins);
+                  totalC += clampNonNeg(entry.carbs);
+                  totalF += clampNonNeg(entry.fats);
+                  if (entry.foodName) userFoodNames.push(entry.foodName.toLowerCase());
                 });
-            } catch { /* no history yet — show curated only */ }
+                const macroKcal = totalP * 4 + totalC * 4 + totalF * 9 || 1;
+                const uProtPct = (totalP * 4) / macroKcal;
+                const uCarbPct = (totalC * 4) / macroKcal;
+                const uFatPct  = (totalF * 9) / macroKcal;
+
+                // Score each curated food by similarity to user's macro profile + name overlap
+                sortedCurated = [...CURATED_POPULAR].map(food => {
+                  const p = food.proteinPer100g || 0;
+                  const c = food.carbsPer100g   || 0;
+                  const f = food.fatPer100g     || 0;
+                  const fMacroKcal = p * 4 + c * 4 + f * 9 || 1;
+                  const fProtPct = (p * 4) / fMacroKcal;
+                  const fCarbPct = (c * 4) / fMacroKcal;
+                  const fFatPct  = (f * 9) / fMacroKcal;
+                  // Lower distance = more similar macro profile
+                  const dist = Math.abs(fProtPct - uProtPct) + Math.abs(fCarbPct - uCarbPct) + Math.abs(fFatPct - uFatPct);
+                  const macroScore = 1 - dist / 2;
+                  // Bonus if user has logged something with a similar name before
+                  const keywords = food.name.toLowerCase().split(/[\s,()]+/).filter(w => w.length > 2);
+                  const nameBonus = userFoodNames.some(n => keywords.some(k => n.includes(k))) ? 0.3 : 0;
+                  return { ...food, _score: macroScore + nameBonus };
+                }).sort((a, b) => b._score - a._score);
+              }
+            } catch { /* use default curated order */ }
           }
-          // Curated list, skip any names the user already has in their freq list
-          const freqNames = new Set(freqItems.map(r => r.name.toLowerCase()));
-          const curatedItems = CURATED_POPULAR.filter(f => !freqNames.has(f.name.toLowerCase()));
-          next = [...freqItems, ...curatedItems];
+          next = sortedCurated;
         }
         if (!cancelled) setItems(next);
       } catch {
@@ -602,8 +605,10 @@ export default function LogFoodScreen({ navigation, route }) {
         </TouchableOpacity>
       </View>
 
-      <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => !saving && setModalOpen(false)}>
-        <View style={s.overlay}>
+      <Modal visible={modalOpen} animationType="slide" transparent onRequestClose={() => { Keyboard.dismiss(); !saving && setModalOpen(false); }}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={s.overlay}>
           <View style={s.card}>
             <View style={s.cardHead}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
@@ -683,7 +688,9 @@ export default function LogFoodScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal visible={scanOpen} animationType="slide" transparent onRequestClose={() => !saving && setScanOpen(false)}>

@@ -37,8 +37,6 @@ export default function CustomPlanBuilderScreen({ navigation, route }) {
   // Plan meta
   const [planName,    setPlanName]    = useState(editPlan?.name ?? "");
   const [daysPerWeek, setDaysPerWeek] = useState(editPlan?.daysPerWeek ?? 1);
-  const [level,  setLevel]  = useState(editPlan?.level ?? "Intermediate");
-  const [goal,   setGoal]   = useState(editPlan?.goal ?? "General Fitness");
   const [desc,   setDesc]   = useState(editPlan?.description ?? "");
 
   // Sessions
@@ -165,10 +163,10 @@ export default function CustomPlanBuilderScreen({ navigation, route }) {
       const plan = {
         id: editPlan?.id ?? `custom_${Date.now()}`,
         name: planName.trim(),
-        level,
-        goal,
+        level: "Custom",
+        goal: "Custom",
         daysPerWeek,
-        description: desc.trim() || `Custom ${level.toLowerCase()} ${goal.toLowerCase()} plan.`,
+        description: desc.trim() || "Custom workout plan.",
         sessions: sessions.filter(s => s.exercises.length > 0),
       };
       await saveCustomPlan(plan, userId);
@@ -233,25 +231,6 @@ export default function CustomPlanBuilderScreen({ navigation, route }) {
             </View>
           </View>
 
-          {/* Level */}
-          <Text style={s.fieldLabel}>Level</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
-            {LEVELS.map(x => (
-              <TouchableOpacity key={x} style={[s.chip, level === x && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => setLevel(x)}>
-                <Text style={[s.chipText, level === x && { color: "#fff" }]}>{x}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Goal */}
-          <Text style={s.fieldLabel}>Goal</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
-            {GOALS.map(x => (
-              <TouchableOpacity key={x} style={[s.chip, goal === x && { backgroundColor: colors.primary, borderColor: colors.primary }]} onPress={() => setGoal(x)}>
-                <Text style={[s.chipText, goal === x && { color: "#fff" }]}>{x}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
         </View>
 
         {/* Sessions */}
