@@ -228,11 +228,11 @@ export const TOUR_STEPS = [
     description:
       "Toggle dark mode, set your preferred units (kg / lbs, ft / m), manage notification reminders for workouts and food logging, control your privacy, and replay this guide anytime.",
   },
-  // ── Tour complete (return to Dashboard) ────────────────────────────────────
+  // ── Tour complete (return to Dashboard, no spotlight) ─────────────────────
   {
     key: "tour_complete",
     tab: "Dashboard",
-    target: "dash_overview",
+    noTarget: true,
     title: "You're all set! 🎉",
     description:
       "That's the full tour. You can replay it anytime from Settings if needed. If you ever have questions, just tap the AI assistant button in the header — it's there to help.",
@@ -304,8 +304,16 @@ const TourCtx = createContext(null);
 
 // tourMode: null | "main" | "plans" | "logfood"
 export function TourProvider({ children, userId }) {
-  const [tourMode, setTourMode] = useState(null);
-  const [stepIdx,  setStepIdx]  = useState(0);
+  const [tourMode, _setTourMode] = useState(null);
+  const [stepIdx,  setStepIdx]   = useState(0);
+
+  // Keep a ref in sync so startTour (which has no tourMode dep) can read the
+  // latest value without being re-created every time tourMode changes.
+  const tourModeRef = useRef(null);
+  const setTourMode = useCallback((val) => {
+    tourModeRef.current = val;
+    _setTourMode(val);
+  }, []);
 
   const targets    = useRef({});
   const contentYs  = useRef({});
@@ -352,6 +360,9 @@ export function TourProvider({ children, userId }) {
 
   // Main tour
   const startTour = useCallback(async () => {
+    // Guard: if a tour is already running (e.g. DashboardScreen re-focuses during
+    // the tour_complete step and re-triggers this setTimeout), do nothing.
+    if (tourModeRef.current !== null) return;
     try {
       const done = await AsyncStorage.getItem(MAIN_KEY(userId));
       if (done === "1") return;
@@ -359,7 +370,7 @@ export function TourProvider({ children, userId }) {
     setStepIdx(0);
     setTourMode("main");
     stepNavigate(TOUR_STEPS[0].tab);
-  }, [userId]);
+  }, [userId, setTourMode]);
 
   const resetTour = useCallback(async () => {
     try {

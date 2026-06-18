@@ -51,6 +51,23 @@ export default function TourOverlay() {
     async function load() {
       setLayout(null);
 
+      // ── No-target steps: show a plain centred tooltip, no spotlight ──
+      if (step.noTarget) {
+        if (cancelled) return;
+        Animated.parallel([
+          Animated.timing(tooltipOpacity, {
+            toValue: 1, duration: 240,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.spring(tooltipTransY, {
+            toValue: 0, tension: 110, friction: 9,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        return;
+      }
+
       // ── Phase 1: wait until TourTarget registers its layout ──
       let l = null;
       for (let i = 0; i < 20; i++) {
