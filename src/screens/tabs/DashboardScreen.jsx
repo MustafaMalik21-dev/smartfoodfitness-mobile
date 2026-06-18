@@ -494,7 +494,7 @@ function WeeklyInsightWidget({ insight, insightLoading, s, colors }) {
 export default function DashboardScreen({ navigation }) {
   const { colors } = useTheme();
   const { auth }   = useAuth();
-  const { startTour, registerScroll } = useTour();
+  const { startTour, registerScroll, registerContentY } = useTour();
   const insets     = useSafeAreaInsets();
   const scrollRef  = useRef(null);
   const userId     = auth?.userId;
@@ -760,13 +760,15 @@ export default function DashboardScreen({ navigation }) {
           <TourTarget tourKey="dash_profile">
             <ProfileButton onPress={() => navigation.navigate("Profile")} />
           </TourTarget>
-          <TouchableOpacity
-            style={[s.chatHeaderBtn, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "35" }]}
-            onPress={() => xNav(navigation, "Chat")}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chatbubble-ellipses" size={17} color={colors.primary} />
-          </TouchableOpacity>
+          <TourTarget tourKey="dash_ai">
+            <TouchableOpacity
+              style={[s.chatHeaderBtn, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "35" }]}
+              onPress={() => xNav(navigation, "Chat")}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chatbubble-ellipses" size={17} color={colors.primary} />
+            </TouchableOpacity>
+          </TourTarget>
         </View>
         <Text style={s.headerTitle}>Dashboard</Text>
         <View style={s.headerRight}>
@@ -867,8 +869,14 @@ export default function DashboardScreen({ navigation }) {
         {widgetLayout.map((id, idx) => {
           const def = ALL_WIDGETS.find((w) => w.id === id);
           if (!def) return null;
+          // For weeklyInsight, capture the outer View's y in the scroll content so the
+          // tour can correctly scroll to it (TourTarget.onLayout.y is relative to its
+          // immediate parent, not the ScrollView, so we register here instead).
+          const onWidgetLayout = id === "weeklyInsight"
+            ? (e) => registerContentY("dash_insight", e.nativeEvent.layout.y)
+            : undefined;
           return (
-            <View key={id}>
+            <View key={id} onLayout={onWidgetLayout}>
               {/* Edit bar */}
               {editMode && (
                 <View style={s.editBar}>

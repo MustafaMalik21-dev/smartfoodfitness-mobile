@@ -57,7 +57,7 @@ export default function TourOverlay() {
         if (cancelled) return;
         l = getTargetLayout(step.target);
         if (l) break;
-        await wait(150);
+        await wait(100);
       }
       if (cancelled) return;
 
@@ -67,13 +67,13 @@ export default function TourOverlay() {
       const scrollRef = getScrollRef(scrollTab);
       if (contentY !== null && scrollRef?.current) {
         scrollRef.current.scrollTo({ y: Math.max(0, contentY - 160), animated: true });
-        await wait(420);
+        await wait(350);
       }
       if (cancelled) return;
 
       // ── Phase 3: re-measure after scroll ───────────────────
       remeasureTarget(step.target);
-      await wait(160);
+      await wait(80);
       if (cancelled) return;
 
       const updated = getTargetLayout(step.target);
@@ -93,7 +93,7 @@ export default function TourOverlay() {
       ]).start();
     }
 
-    const t = setTimeout(load, 220);
+    const t = setTimeout(load, 60);
     return () => { cancelled = true; clearTimeout(t); };
   }, [active, stepIdx]);
 

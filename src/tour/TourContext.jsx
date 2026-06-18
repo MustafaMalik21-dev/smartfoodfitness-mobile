@@ -184,14 +184,14 @@ export const TOUR_STEPS = [
     description:
       "Connect with friends, share milestones, and keep each other accountable. See friend requests in the Friends tab, check direct messages, or browse the FAQ for common questions.",
   },
-  // ── Chat ───────────────────────────────────────────────────────────────────
+  // ── AI Assistant header button (Dashboard) ────────────────────────────────
   {
-    key: "chat_home",
-    tab: "Chat",
-    target: "chat_home",
+    key: "dash_ai",
+    tab: "Dashboard",
+    target: "dash_ai",
     title: "AI Assistant",
     description:
-      "Your personal nutrition and fitness coach. Ask anything — meal suggestions, workout tips, recipe ideas, or how to hit your macros. It uses your profile data to give personalised answers.",
+      "Your personal nutrition and fitness coach — always in the header. Tap to ask anything: meal suggestions, workout tips, recipe ideas, or how to hit your macros. It uses your profile to give personalised answers.",
   },
   // ── Dashboard (return) ─────────────────────────────────────────────────────
   {
@@ -227,6 +227,15 @@ export const TOUR_STEPS = [
     title: "Settings",
     description:
       "Toggle dark mode, set your preferred units (kg / lbs, ft / m), manage notification reminders for workouts and food logging, control your privacy, and replay this guide anytime.",
+  },
+  // ── Tour complete (return to Dashboard) ────────────────────────────────────
+  {
+    key: "tour_complete",
+    tab: "Dashboard",
+    target: "dash_overview",
+    title: "You're all set! 🎉",
+    description:
+      "That's the full tour. You can replay it anytime from Settings if needed. If you ever have questions, just tap the AI assistant button in the header — it's there to help.",
   },
 ];
 
