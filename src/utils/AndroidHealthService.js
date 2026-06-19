@@ -10,18 +10,30 @@
  * available as a Play Store app on Android 9+).
  */
 import { Linking, Platform } from "react-native";
-import {
-  getSdkStatus,
-  initialize,
-  requestPermission,
-  getGrantedPermissions,
-  readRecords,
-  openHealthConnectSettings,
-  SdkAvailabilityStatus,
-} from "react-native-health-connect";
+
+// ── Safe import of react-native-health-connect ────────────────────────────────
+// With New Architecture (TurboModules), importing an unregistered native module
+// throws immediately. Wrap with require() + try/catch so the app doesn't crash
+// when running in Expo Go or a dev client built before this module was added.
+let HC = null;
+let _moduleAvailable = false;
+try {
+  HC = require("react-native-health-connect");
+  _moduleAvailable = true;
+} catch (e) {
+  console.warn("[AndroidHealth] react-native-health-connect not available:", e.message);
+}
+
+const getSdkStatus           = HC?.getSdkStatus;
+const initialize             = HC?.initialize;
+const requestPermission      = HC?.requestPermission;
+const getGrantedPermissions  = HC?.getGrantedPermissions;
+const readRecords            = HC?.readRecords;
+const openHealthConnectSettings = HC?.openHealthConnectSettings;
+const SdkAvailabilityStatus  = HC?.SdkAvailabilityStatus ?? { SDK_AVAILABLE: 3 };
 
 // ── Availability flag ─────────────────────────────────────────────────────────
-export let HEALTH_AVAILABLE = Platform.OS === "android";
+export let HEALTH_AVAILABLE = Platform.OS === "android" && _moduleAvailable;
 
 // ── Permission / init state ───────────────────────────────────────────────────
 // "idle" | "requesting" | "granted" | "denied" | "sdk_unavailable"
@@ -37,7 +49,9 @@ export function resetHealthInit() {
 
 // Open Health Connect settings (for "denied" state)
 export function openHealthSettings() {
-  openHealthConnectSettings();
+  if (openHealthConnectSettings) {
+    openHealthConnectSettings();
+  }
 }
 
 // Open Play Store to install Health Connect (for "sdk_unavailable" state)
@@ -59,6 +73,11 @@ const PERMISSIONS = [
 
 // ── Init & permission request ─────────────────────────────────────────────────
 export function initHealth() {
+  if (!_moduleAvailable) {
+    _permStatus = "sdk_unavailable";
+    return Promise.resolve(false);
+  }
+
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
