@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, StyleSheet, Text, TouchableOpacity, View }
 import * as Notifications from "expo-notifications";
 import { setupNotificationChannel, restoreLocalNotifications } from "./src/utils/localNotifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import ErrorBoundary from "./src/components/ErrorBoundary";
 
 // Show notifications as alerts even when the app is foregrounded
 Notifications.setNotificationHandler({
@@ -61,6 +62,20 @@ import ActivityTrackingScreen from "./src/screens/fitness/ActivityTrackingScreen
 
 import ProfileScreen from "./src/screens/profile/ProfileScreen";
 import NotificationsScreen from "./src/screens/profile/NotificationsScreen";
+
+// ── Global JS error handler ───────────────────────────────────────────────────
+// Catches unhandled JS exceptions outside React's render cycle (async functions,
+// event handlers, module-level code). ErrorBoundary above catches render errors.
+// Only installed in production — dev mode keeps the red error overlay.
+if (!__DEV__) {
+  const _prevHandler = ErrorUtils.getGlobalHandler();
+  ErrorUtils.setGlobalHandler((error, isFatal) => {
+    console.error(
+      `[GlobalError] ${isFatal ? "FATAL" : "non-fatal"}: ${error?.message}\n${error?.stack}`,
+    );
+    _prevHandler?.(error, isFatal);
+  });
+}
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -385,12 +400,14 @@ function AppInner() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppInner />
-        </AuthProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppInner />
+          </AuthProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

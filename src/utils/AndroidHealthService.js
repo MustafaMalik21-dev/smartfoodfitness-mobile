@@ -36,7 +36,7 @@ const SdkAvailabilityStatus  = HC?.SdkAvailabilityStatus ?? { SDK_AVAILABLE: 3 }
 export let HEALTH_AVAILABLE = Platform.OS === "android" && _moduleAvailable;
 
 // ── Permission / init state ───────────────────────────────────────────────────
-// "idle" | "requesting" | "granted" | "denied" | "sdk_unavailable"
+// "idle" | "requesting" | "granted" | "denied" | "sdk_unavailable" | "sdk_update_required"
 let _permStatus  = "idle";
 let _initPromise = null;
 
@@ -83,10 +83,12 @@ export function initHealth() {
   _initPromise = (async () => {
     try {
       // 1. Check if Health Connect SDK is available on this device
+      //    SDK_UNAVAILABLE (1) = not installed; SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED (2) = needs update
       const sdkStatus = await getSdkStatus();
       if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
-        console.log("[AndroidHealth] SDK not available, status:", sdkStatus);
-        _permStatus = "sdk_unavailable";
+        const needsUpdate = sdkStatus === (SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ?? 2);
+        console.log("[AndroidHealth] SDK not available, status:", sdkStatus, needsUpdate ? "(needs update)" : "(not installed)");
+        _permStatus = needsUpdate ? "sdk_update_required" : "sdk_unavailable";
         return false;
       }
 

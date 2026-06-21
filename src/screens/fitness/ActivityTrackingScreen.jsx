@@ -409,8 +409,8 @@ export default function ActivityTrackingScreen({ navigation }) {
       const granted = await initHealth();
       setHealthStatus(getHealthStatus());
       if (!granted) { setLoading(false); return; }
-    } else if (status === "sdk_unavailable") {
-      // Health Connect might have been installed since last check — re-try
+    } else if (status === "sdk_unavailable" || status === "sdk_update_required") {
+      // Health Connect might have been installed/updated since last check — re-try
       resetHealthInit();
       setHealthStatus("requesting");
       const granted = await initHealth();
@@ -499,8 +499,9 @@ export default function ActivityTrackingScreen({ navigation }) {
   if (
     healthStatus === "idle"         ||
     healthStatus === "requesting"   ||
-    healthStatus === "denied"       ||
-    healthStatus === "sdk_unavailable"
+    healthStatus === "denied"            ||
+    healthStatus === "sdk_unavailable"   ||
+    healthStatus === "sdk_update_required"
   ) {
     return (
       <SafeAreaView style={s.screen} edges={["top"]}>
@@ -525,14 +526,34 @@ export default function ActivityTrackingScreen({ navigation }) {
           ) : healthStatus === "sdk_unavailable" ? (
             <>
               <Ionicons name="fitness-outline" size={52} color={colors.textLight} />
-              <Text style={s.unavailTitle}>Health Connect Required</Text>
+              <Text style={s.unavailTitle}>Install Health Connect</Text>
               <Text style={s.unavailSub}>
-                SmartFoodFitness uses Health Connect to read your steps, calories, and heart rate.
-                It's a free Google app — install it, then come back and open this screen again.
+                Health Connect is Android's built-in health hub — the same idea as Apple Health on iPhone.
+                Samsung Health, Google Fit, Fitbit and others all sync their data into it, and apps like this one read from it.{"\n\n"}
+                It's free and pre-installed on Android 14+. If you don't have it yet, install it below, then open Samsung Health → Settings → Connected services → Health Connect to link your data.
               </Text>
               <TouchableOpacity style={s.permBtn} onPress={openHealthConnectInstall}>
                 <Ionicons name="download-outline" size={16} color="#fff" />
-                <Text style={s.permBtnText}>Get Health Connect</Text>
+                <Text style={s.permBtnText}>Install Health Connect</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.permBtnSecondary} onPress={load}>
+                <Text style={[s.permBtnText, { color: colors.primary }]}>Already Installed — Try Again</Text>
+              </TouchableOpacity>
+            </>
+          ) : healthStatus === "sdk_update_required" ? (
+            <>
+              <Ionicons name="refresh-circle-outline" size={52} color={colors.textLight} />
+              <Text style={s.unavailTitle}>Health Connect Needs an Update</Text>
+              <Text style={s.unavailSub}>
+                You have Health Connect installed, but it needs to be updated before this app can read your health data.
+                Tap below to open the Play Store and update it, then come back here.
+              </Text>
+              <TouchableOpacity style={s.permBtn} onPress={openHealthConnectInstall}>
+                <Ionicons name="refresh-outline" size={16} color="#fff" />
+                <Text style={s.permBtnText}>Update Health Connect</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.permBtnSecondary} onPress={load}>
+                <Text style={[s.permBtnText, { color: colors.primary }]}>Already Updated — Try Again</Text>
               </TouchableOpacity>
             </>
           ) : healthStatus === "denied" ? (
@@ -566,7 +587,7 @@ export default function ActivityTrackingScreen({ navigation }) {
               </Text>
               <Text style={s.unavailSub}>
                 {isAndroid
-                  ? "Allow SmartFoodFitness to read your steps, active calories, and heart rate from Health Connect. Works with Samsung Health, Google Fit, Fitbit, and more."
+                  ? "Allow SmartFoodFitness to read your steps, active calories, and heart rate from Health Connect — Android's health hub that Samsung Health, Google Fit, Fitbit and others sync into automatically."
                   : "Allow SmartFoodFitness to read your steps, active calories, and heart rate from Apple Health. Your data stays on your device."}
               </Text>
               <TouchableOpacity style={s.permBtn} onPress={requestPermissions}>
