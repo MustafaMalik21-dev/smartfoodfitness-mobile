@@ -10,6 +10,7 @@ import { useAuth } from "../../auth/useAuth";
 import { useTheme } from "../../ThemeContext";
 import { font, radius, spacing } from "../../theme";
 import TourTarget from "../../tour/TourTarget";
+import { devLog } from "../../utils/devLog";
 
 const SUGGESTIONS = [
   { icon: "restaurant-outline",  text: "What should I eat to hit my protein goal?" },
@@ -71,7 +72,7 @@ export default function ChatScreen({ navigation }) {
       setMessages((prev) => [...prev, { id: `a_${Date.now()}`, role: "assistant", text: reply }]);
     } catch (err) {
       const status = err?.response?.status;
-      console.log("[Chat] API error — status:", status, "message:", err?.message);
+      devLog("[Chat] API error — status:", status, "message:", err?.message);
       const errText = status === 404
         ? "Chat endpoint not found — restart the backend server."
         : status >= 500

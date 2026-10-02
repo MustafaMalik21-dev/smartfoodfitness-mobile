@@ -10,6 +10,7 @@
  * available as a Play Store app on Android 9+).
  */
 import { Linking, Platform } from "react-native";
+import { devLog, devWarn } from "./devLog";
 
 // ── Safe import of react-native-health-connect ────────────────────────────────
 // With New Architecture (TurboModules), importing an unregistered native module
@@ -21,7 +22,7 @@ try {
   HC = require("react-native-health-connect");
   _moduleAvailable = true;
 } catch (e) {
-  console.warn("[AndroidHealth] react-native-health-connect not available:", e.message);
+  devWarn("[AndroidHealth] react-native-health-connect not available:", e.message);
 }
 
 const getSdkStatus           = HC?.getSdkStatus;
@@ -87,7 +88,7 @@ export function initHealth() {
       const sdkStatus = await getSdkStatus();
       if (sdkStatus !== SdkAvailabilityStatus.SDK_AVAILABLE) {
         const needsUpdate = sdkStatus === (SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED ?? 2);
-        console.log("[AndroidHealth] SDK not available, status:", sdkStatus, needsUpdate ? "(needs update)" : "(not installed)");
+        devLog("[AndroidHealth] SDK not available, status:", sdkStatus, needsUpdate ? "(needs update)" : "(not installed)");
         _permStatus = needsUpdate ? "sdk_update_required" : "sdk_unavailable";
         return false;
       }
@@ -103,7 +104,7 @@ export function initHealth() {
           p.accessType === "read"
       );
       if (alreadyHasAny) {
-        console.log("[AndroidHealth] permissions already granted ✓");
+        devLog("[AndroidHealth] permissions already granted ✓");
         _permStatus = "granted";
         return true;
       }
@@ -116,16 +117,16 @@ export function initHealth() {
       );
 
       if (hasAny) {
-        console.log("[AndroidHealth] permissions granted ✓");
+        devLog("[AndroidHealth] permissions granted ✓");
         _permStatus = "granted";
         return true;
       } else {
-        console.log("[AndroidHealth] permissions denied");
+        devLog("[AndroidHealth] permissions denied");
         _permStatus = "denied";
         return false;
       }
     } catch (e) {
-      console.log("[AndroidHealth] initHealth error:", e);
+      devLog("[AndroidHealth] initHealth error:", e);
       _permStatus = "denied";
       return false;
     }

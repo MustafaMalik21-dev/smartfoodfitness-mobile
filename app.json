@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mustafa.smartfoodfitness",
-      "buildNumber": "2",
+      "buildNumber": "4",
       "entitlements": {
         "com.apple.developer.healthkit": true,
         "com.apple.developer.healthkit.access": []
@@ -78,7 +78,8 @@
             "targetSdkVersion": 35
           }
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

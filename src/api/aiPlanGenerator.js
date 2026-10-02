@@ -1,5 +1,5 @@
 import { EXERCISES } from "../data/exercises";
-import { ANTHROPIC_API_KEY } from "../config";
+import apiClient from "./apiClient";
 
 const EQUIPMENT_MAP = {
   "Full Gym": null,
@@ -76,74 +76,21 @@ export async function generateAIPlan(profile, answers) {
   const split =
     daysPerWeek <= 3 ? "Full Body" : daysPerWeek === 4 ? "Upper/Lower" : "Push/Pull/Legs";
 
-  const repRule =
-    goal === "Strength"      ? "3–5 reps, high weight"
-    : goal === "Muscle Gain" ? "8–12 reps, moderate-heavy weight"
-    : goal === "Fat Loss"    ? "12–20 reps, shorter rest"
-    :                          "8–12 reps";
+  // The backend assembles the prompt and calls Anthropic with its server-held
+  // key — the mobile bundle must never contain API credentials.
+  // Generating a plan can take most of the backend's own budget (8s connect +
+  // 60s read), so this call has to outlast it; the shared 15s default would
+  // abort a request the server is still answering.
+  const res = await apiClient.post("/api/ai/generate-plan", {
+    daysPerWeek,
+    equipment,
+    experienceLevel: expLevel,
+    activityLevel: actLevel,
+    aims,
+    exerciseMenu: menu,
+  }, { timeout: 70000 });
 
-  const volumeRule =
-    expLevel === "Beginner"     ? "4–5 exercises per session, compound-focused, no redundancy"
-    : expLevel === "Advanced"   ? "6–8 exercises per session, include isolation work"
-    :                             "5–7 exercises per session, mix compound and isolation";
-
-  const splitRule =
-    daysPerWeek <= 3
-      ? `${daysPerWeek} full-body sessions labelled A/B/C. Each hits chest, back, legs, shoulders, core.`
-      : daysPerWeek === 4
-      ? "4 sessions: Upper A, Lower A, Upper B, Lower B."
-      : `${daysPerWeek} sessions: Push (chest/shoulders/triceps), Pull (back/biceps), Legs (quads/hamstrings/glutes/core)${daysPerWeek >= 5 ? ", then repeat sequence for remaining days" : ""}.`;
-
-  const cardioRule = goal === "Fat Loss" ? "Add 1 cardio exercise per session (e.g. Treadmill Run, Jump Rope)." : "";
-
-  const prompt = `You are an elite personal trainer. Output ONLY valid JSON — no markdown, no prose.
-
-Create a ${daysPerWeek}-day/week ${split} workout plan.
-Client: ${expLevel} · ${actLevel} activity · Goals: ${aims.join(", ") || "General Fitness"} · Equipment: ${equipment}
-
-AVAILABLE EXERCISES (use ONLY exact names):
-${menu}
-
-Split structure: ${splitRule}
-Volume: ${volumeRule}
-Reps: ${repRule}
-${cardioRule}
-
-Return this JSON (no extra fields):
-{
-  "name": "short catchy plan name",
-  "goal": "${goal}",
-  "description": "one personalised sentence max 120 chars",
-  "sessions": [
-    {
-      "title": "Session title",
-      "exercises": [{ "name": "exact name", "sets": 4, "reps": "8-10" }]
-    }
-  ]
-}`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    if (res.status === 401) throw new Error("Invalid API key — update ANTHROPIC_API_KEY in src/config.js");
-    throw new Error(`Anthropic API error ${res.status}: ${body.slice(0, 120)}`);
-  }
-
-  const data = await res.json();
-  const text = (data.content?.[0]?.text || "").trim();
+  const text = (res.data?.text || "").trim();
 
   let parsed;
   try {

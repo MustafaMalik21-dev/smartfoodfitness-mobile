@@ -7,6 +7,7 @@
  * authoritative source.
  */
 import { NativeModules, Platform } from "react-native";
+import { devLog } from "./devLog";
 
 // ── Native module reference ───────────────────────────────────────────────────
 let HK = null;
@@ -15,7 +16,7 @@ export let HK_AVAILABLE = false;
 if (Platform.OS === "ios") {
   HK = NativeModules.AppleHealthKit ?? null;
   HK_AVAILABLE = typeof HK?.initHealthKit === "function";
-  console.log("[HealthKit] NativeModules.AppleHealthKit:",
+  devLog("[HealthKit] NativeModules.AppleHealthKit:",
     HK ? "present" : "MISSING",
     "| HK_AVAILABLE:", HK_AVAILABLE);
 }
@@ -41,11 +42,11 @@ export function initHealthKit() {
       { permissions: { read: [P.Steps, P.ActiveEnergyBurned, P.HeartRate, P.RestingHeartRate], write: [] } },
       (err) => {
         if (err) {
-          console.log("[HealthKit] initHealthKit error:", err);
+          devLog("[HealthKit] initHealthKit error:", err);
           _permStatus = "denied";
           resolve(false);
         } else {
-          console.log("[HealthKit] permissions granted ✓");
+          devLog("[HealthKit] permissions granted ✓");
           _permStatus = "granted";
           resolve(true);
         }

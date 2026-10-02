@@ -16,7 +16,7 @@ import TourTarget from "../../tour/TourTarget";
 const TABS = ["Friends", "Messages", "FAQ"];
 
 const FAQ_ITEMS = [
-  { q: "How do I add a friend?",          a: "Go to the Friends tab, tap the search icon in the top right, then search by name or email and send a request." },
+  { q: "How do I add a friend?",          a: "Go to the Friends tab, tap the search icon in the top right, then search by name — or by their full email address — and send a request." },
   { q: "Can friends see my weight?",       a: "Only if you allow it. Go to Settings → Privacy and toggle 'Share weight data'. Friends see your latest weight and BMI." },
   { q: "Can friends see my workouts?",     a: "Yes, if 'Share activity' is on in Settings → Privacy. They can see how many workouts you've completed this week." },
   { q: "How do I message a friend?",       a: "Tap any friend in your friends list, then tap the message icon on their card. You can only message accepted friends." },
@@ -359,7 +359,7 @@ export default function SocialScreen({ navigation }) {
                   style={[s.searchInput, { color: colors.text }]}
                   value={searchQ}
                   onChangeText={setSearchQ}
-                  placeholder="Search by name or email…"
+                  placeholder="Search by name or full email…"
                   placeholderTextColor={colors.textSecondary}
                   autoFocus
                 />
@@ -374,9 +374,14 @@ export default function SocialScreen({ navigation }) {
 
               <ScrollView style={{ maxHeight: 360 }}>
                 {!searchLoading && searchQ.length >= 2 && searchResults.length === 0 && (
-                  <Text style={{ color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg, fontSize: font.sm }}>
-                    No users found for "{searchQ}"
-                  </Text>
+                  <View style={{ marginTop: spacing.lg, gap: 4 }}>
+                    <Text style={{ color: colors.textSecondary, textAlign: "center", fontSize: font.sm }}>
+                      No users found for "{searchQ}"
+                    </Text>
+                    <Text style={{ color: colors.textLight, textAlign: "center", fontSize: 11 }}>
+                      Try their display name, or type their full email address.
+                    </Text>
+                  </View>
                 )}
                 {searchResults.map(user => {
                   const col = avatarColor(user.userId);
@@ -386,7 +391,10 @@ export default function SocialScreen({ navigation }) {
                       <Avatar name={user.displayName} color={col} size={40} />
                       <View style={{ flex: 1 }}>
                         <Text style={[s.friendName, { color: colors.text }]}>{user.displayName}</Text>
-                        <Text style={{ fontSize: 11, color: colors.textSecondary }}>{user.email}</Text>
+                        {/* Server sends the address partially hidden — never the full one. */}
+                        {user.email ? (
+                          <Text style={{ fontSize: 11, color: colors.textSecondary }}>{user.email}</Text>
+                        ) : null}
                       </View>
                       {status === "ACCEPTED" ? (
                         <View style={s.alreadyFriendBadge}>

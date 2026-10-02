@@ -1,0 +1,99 @@
+#!/bin/sh
+#
+# SmartFoodFitness pre-commit hook — refuses commits that carry an obvious secret.
+#
+# Enable once per clone:
+#   git config core.hooksPath .githooks
+#   chmod +x .githooks/pre-commit        # macOS / Linux only
+#
+# Runs gitleaks when it is installed and a grep sweep of the staged diff when it
+# is not. A missing tool prints an install hint; it never blocks a commit by
+# itself. Emergency bypass: git commit --no-verify
+#
+# Only STAGED content is inspected, and only added lines — deleting a secret is
+# always committable.
+
+set -u
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+config="$repo_root/.gitleaks.toml"
+
+report_and_block() {
+  echo ""
+  echo "pre-commit: possible secret in staged changes — commit aborted."
+  echo ""
+  echo "  Move the value to an environment variable (server side) and rotate it"
+  echo "  if it was ever live. Nothing bundled into the app is private."
+  echo "  Background and remediation steps: SECURITY.md"
+  echo "  False positive: add an allowlist entry to .gitleaks.toml"
+  echo "  Emergency bypass: git commit --no-verify"
+  echo ""
+}
+
+# ── gitleaks path ─────────────────────────────────────────────────────────────
+if command -v gitleaks >/dev/null 2>&1; then
+  # Positional params carry the optional --config so a repo path containing
+  # spaces still quotes correctly.
+  if [ -f "$config" ]; then
+    set -- --config "$config"
+  else
+    set --
+  fi
+
+  # gitleaks >= 8.19 replaced `protect` with `git --staged`.
+  if gitleaks git --help >/dev/null 2>&1; then
+    gitleaks git --staged --redact --no-banner "$@"
+  else
+    gitleaks protect --staged --redact --no-banner "$@"
+  fi
+  status=$?
+
+  if [ "$status" -ne 0 ]; then
+    report_and_block
+    exit 1
+  fi
+  exit 0
+fi
+
+echo "pre-commit: gitleaks not installed — using the weaker built-in grep check."
+echo "            Install it for full coverage:"
+echo "              macOS    brew install gitleaks"
+echo "              Windows  scoop install gitleaks   (or winget install gitleaks)"
+echo "              Go       go install github.com/zricethezav/gitleaks/v8@latest"
+echo "              Binaries https://github.com/gitleaks/gitleaks/releases"
+
+# ── grep fallback — highest-signal patterns only ──────────────────────────────
+patterns="sk-ant-[A-Za-z0-9]+-[A-Za-z0-9_-]{40,}"
+patterns="$patterns|(A3T[A-Z0-9]|AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}"
+patterns="$patterns|-----BEGIN[ A-Z0-9]*PRIVATE KEY"
+patterns="$patterns|eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"
+patterns="$patterns|(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}"
+patterns="$patterns|(api[_-]?key|apikey|secret|token|passwd|password)[\"' ]*[:=]{1,2} *[\"'][A-Za-z0-9_+/=.-]{24,}[\"']"
+
+ignore='example|sample|dummy|fake|placeholder|redacted|changeme|your[_-]?key|test[_-]secret|xxxx|process\.env|import\.meta\.env|\$\{'
+
+findings=$(
+  git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r f; do
+    case "$f" in
+      node_modules/*|*/node_modules/*)                          continue ;;
+      package-lock.json|*/package-lock.json|yarn.lock|*/yarn.lock) continue ;;
+      target/*|*/target/*|dist/*|*/dist/*)                      continue ;;
+      .gitleaks.toml|.githooks/*|SECURITY.md)                   continue ;;
+    esac
+    git diff --cached --no-color -U0 -- "$f" |
+      sed -n 's/^+//p' |
+      grep -Ei "$patterns" |
+      grep -Eiv "$ignore" |
+      cut -c1-80 |
+      awk -v file="$f" '{ print "  " file ": " $0 }'
+  done
+)
+
+if [ -n "$findings" ]; then
+  echo ""
+  echo "$findings"
+  report_and_block
+  exit 1
+fi
+
+exit 0

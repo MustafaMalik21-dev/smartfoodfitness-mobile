@@ -1,0 +1,98 @@
+title = "SmartFoodFitness mobile — secret scanning"
+
+# Used by .githooks/pre-commit and by any manual run:
+#   gitleaks git --staged --config .gitleaks.toml     (gitleaks >= 8.19)
+#   gitleaks protect --staged --config .gitleaks.toml (older gitleaks)
+#
+# Rule IDs are prefixed "sff-" so this file can also be used with
+# [extend] useDefault = true without colliding with the built-in rule set.
+
+[[rules]]
+id = "sff-anthropic-api-key"
+description = "Anthropic API key"
+regex = '''sk-ant-(?:api|admin)[0-9]{2}-[A-Za-z0-9_\-]{24,}'''
+keywords = ["sk-ant-"]
+tags = ["anthropic", "api-key"]
+
+[[rules]]
+id = "sff-generic-api-key"
+description = "High-entropy value assigned to a key/secret/token identifier"
+# No leading \b — the identifier is usually a suffix (ANTHROPIC_API_KEY, myToken).
+regex = '''(?i)(?:api[_-]?key|apikey|secret|token|passwd|password)\b["' \t]*[:=]{1,2}[ \t]*["'`]([A-Za-z0-9_\-.+/=]{20,})["'`]'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["apikey", "api_key", "api-key", "secret", "token", "passwd", "password"]
+tags = ["generic"]
+
+[[rules]]
+id = "sff-aws-access-key-id"
+description = "AWS access key ID"
+regex = '''\b(?:A3T[A-Z0-9]|AKIA|ABIA|ACCA|ASIA)[0-9A-Z]{16}\b'''
+keywords = ["a3t", "akia", "abia", "acca", "asia"]
+tags = ["aws"]
+
+[[rules]]
+id = "sff-aws-secret-access-key"
+description = "AWS secret access key"
+regex = '''(?i)aws[_\-.]?(?:secret|sec)[_\-.]?(?:access[_\-.]?)?key\b["' \t]*[:=]{1,2}[ \t]*["'`]?([A-Za-z0-9/+=]{40})["'`]?'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["aws"]
+tags = ["aws"]
+
+[[rules]]
+id = "sff-private-key"
+description = "Private key PEM block"
+regex = '''-----BEGIN[ A-Z0-9]*PRIVATE KEY(?: BLOCK)?-----'''
+keywords = ["private key"]
+tags = ["pem", "key"]
+
+[[rules]]
+id = "sff-jwt"
+description = "JWT-looking literal (three base64url segments)"
+regex = '''\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}'''
+keywords = ["eyj"]
+tags = ["jwt", "token"]
+
+[[rules]]
+id = "sff-github-token"
+description = "GitHub personal access / OAuth token"
+regex = '''\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}\b|\bgithub_pat_[A-Za-z0-9_]{60,}\b'''
+keywords = ["ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_"]
+tags = ["github", "token"]
+
+[allowlist]
+description = "Public identifiers, vendored files and the security tooling itself"
+# Match the regexes below against the whole line, not just the captured secret,
+# so context ("process.env.", a placeholder, an expo.dev URL) can clear a finding.
+regexTarget = "line"
+
+paths = [
+  # Vendored / generated — not authored here, and lock files are full of hashes.
+  '''(^|/)node_modules/''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)yarn\.lock$''',
+  '''(^|/)dist/''',
+  '''(^|/)\.expo/''',
+  # These three files describe the secret patterns, so they match themselves.
+  '''^\.gitleaks\.toml$''',
+  '''^\.githooks/''',
+  '''^SECURITY\.md$''',
+]
+
+regexes = [
+  # EAS project ID and the EAS Update URL built from it — public identifiers
+  # printed by `eas project:info`, not credentials.
+  '''176657f7-9fb4-498d-80a6-1e2448d52a87''',
+  '''https://u\.expo\.dev/''',
+  # Any bare UUID: BLE service/characteristic UUIDs in QNScaleService.js, Expo
+  # project IDs, Android/iOS identifiers.
+  '''[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}''',
+  # Values read at runtime rather than hardcoded.
+  '''process\.env\.''',
+  '''import\.meta\.env''',
+  '''Constants\.expoConfig''',
+  '''\$\{[A-Za-z0-9_]+''',
+  # Obvious non-secrets in docs, samples and tests.
+  '''(?i)(example|sample|dummy|fake|placeholder|redacted|changeme|your[_-]?(api[_-]?)?key|test[_-]secret|xxxx)''',
+]

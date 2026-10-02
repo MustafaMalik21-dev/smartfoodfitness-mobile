@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
-import { syncLocalNotifications } from "../../utils/localNotifications";
+import { restoreLocalNotifications, syncLocalNotifications } from "../../utils/localNotifications";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -10,12 +10,50 @@ import { font, radius, spacing } from "../../theme";
 import TourTarget from "../../tour/TourTarget";
 import { useTour } from "../../tour/TourContext";
 import apiClient from "../../api/apiClient";
+import ChangePasswordModal from "../../components/ChangePasswordModal";
+import DeleteAccountModal from "../../components/DeleteAccountModal";
 
 const LS_KEY = "sff_settings_v1";
+const DANGER = "#ef4444";
 const DEFAULTS = {
   units: { weight: "kg", height: "ft" },
   notifications: { workouts: true, food: true, streak: true },
 };
+
+// Keys that hold this user's content but are not suffixed with their id, so the
+// generic `sff_*_<userId>` sweep below cannot reach them. Everything scoped per
+// user is removed by suffix instead, which keeps this list from going stale.
+const UNSCOPED_LOCAL_KEYS = [
+  LS_KEY,
+  "sff_fav_recipes",
+  "sff_featured_recipe",
+  "sff_show_micros",
+  "sff_micro_rdis",
+  "sff_water_goal_ml",
+  "sff_notif_food_last",
+  "sff_notif_streak_last",
+  "sff_notif_workout_last",
+  "sff_custom_plans",
+  "sff_active_local_plan",
+  "sff_plan_history",
+  "sff_exercise_defaults",
+  "sff_workout_queue",
+  "sff_ai_plan",
+  "sff_rec_answers",
+];
+
+async function purgeDeviceData(userId) {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const suffix = `_${userId}`;
+    const doomed = keys.filter(
+      (k) => UNSCOPED_LOCAL_KEYS.includes(k) || (userId != null && k.startsWith("sff_") && k.endsWith(suffix)),
+    );
+    if (doomed.length) await AsyncStorage.multiRemove(doomed);
+  } catch {}
+  // Cancels the daily reminders without re-prompting for OS permission.
+  try { await restoreLocalNotifications({ workouts: false, food: false, streak: false }); } catch {}
+}
 
 async function loadSettings() {
   try {
@@ -89,6 +127,9 @@ export default function SettingsScreen({ navigation }) {
   const [privacy, setPrivacy] = useState({ profileVisibility: "friends", shareWeight: true, shareActivity: true });
   const [privacySaving, setPrivacySaving] = useState(false);
 
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+
   useEffect(() => {
     loadSettings().then((s) => { setSettings(s); setLoaded(true); });
   }, []);
@@ -117,6 +158,15 @@ export default function SettingsScreen({ navigation }) {
   function update(next) {
     setSettings(next);
     saveSettings(next);
+  }
+
+  // Only reached after the server answered 204 — a failed delete leaves the
+  // session and every local key untouched.
+  async function onAccountDeleted() {
+    await purgeDeviceData(userId);
+    setDeleteOpen(false);
+    resetTheme();
+    logout();
   }
 
   const setUnit = (k, v) => update({ ...settings, units: { ...settings.units, [k]: v } });
@@ -234,6 +284,27 @@ export default function SettingsScreen({ navigation }) {
           </Text>
         </View>
 
+        {/* Account Security */}
+        <View style={s.card}>
+          <View style={s.prefLabelRow}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+            <Text style={s.cardTitle}>Account Security</Text>
+          </View>
+
+          <TouchableOpacity style={s.actionRow} onPress={() => setPasswordOpen(true)}>
+            <View style={s.actionLabelWrap}>
+              <Ionicons name="key-outline" size={18} color={colors.textSecondary} />
+              <View style={s.actionTextWrap}>
+                <Text style={s.prefLabel}>Change password</Text>
+                <Text style={[s.settingNote, { color: colors.textSecondary }]}>
+                  Update the password you use to sign in
+                </Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity style={s.replayBtn} onPress={resetTour}>
           <Ionicons name="play-circle-outline" size={18} color={colors.primary} />
           <Text style={[s.replayText, { color: colors.primary }]}>Replay App Guide</Text>
@@ -243,7 +314,30 @@ export default function SettingsScreen({ navigation }) {
           <Ionicons name="log-out-outline" size={18} color={colors.error} />
           <Text style={s.logoutText}>Log out</Text>
         </TouchableOpacity>
+
+        {/* Danger Zone */}
+        <View style={s.dangerCard}>
+          <View style={s.prefLabelRow}>
+            <Ionicons name="warning-outline" size={18} color={colors.error} />
+            <Text style={[s.cardTitle, { color: colors.error }]}>Danger Zone</Text>
+          </View>
+          <Text style={[s.settingNote, { color: colors.textSecondary }]}>
+            Deleting your account permanently erases your profile, food logs, weight and body
+            composition history, workouts, messages and friends. This cannot be undone.
+          </Text>
+          <TouchableOpacity style={s.deleteBtn} onPress={() => setDeleteOpen(true)}>
+            <Ionicons name="trash-outline" size={18} color="#fff" />
+            <Text style={s.deleteBtnText}>Delete Account</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      <ChangePasswordModal visible={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <DeleteAccountModal
+        visible={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={onAccountDeleted}
+      />
     </SafeAreaView>
   );
 }
@@ -270,6 +364,9 @@ function makeStyles(colors) {
     prefRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     prefLabelRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     prefLabel: { fontSize: font.base, color: colors.text },
+    actionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+    actionLabelWrap: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+    actionTextWrap: { flex: 1 },
     replayBtn: {
       borderWidth: 1.5, borderColor: colors.primary, borderRadius: radius.lg,
       paddingVertical: 14, alignItems: "center", marginTop: spacing.sm,
@@ -282,5 +379,16 @@ function makeStyles(colors) {
       flexDirection: "row", justifyContent: "center", gap: 8,
     },
     logoutText: { color: colors.error, fontSize: font.lg, fontWeight: font.semiBold },
+    dangerCard: {
+      backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.sm,
+      borderWidth: 1.5, borderColor: colors.error,
+      marginTop: spacing.lg, marginBottom: spacing.lg,
+    },
+    deleteBtn: {
+      backgroundColor: DANGER, borderRadius: radius.lg, paddingVertical: 14,
+      alignItems: "center", justifyContent: "center",
+      flexDirection: "row", gap: 8, marginTop: spacing.xs,
+    },
+    deleteBtnText: { color: "#fff", fontSize: font.base, fontWeight: font.bold },
   });
 }

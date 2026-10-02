@@ -99,7 +99,7 @@ export default function ConversationScreen({ navigation, route }) {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={[styles.headerName, { color: colors.text }]}>{friendName ?? "Message"}</Text>
-          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>End-to-end secured</Text>
+          <Text style={[styles.headerSub, { color: colors.textSecondary }]}>Private conversation</Text>
         </View>
       </View>
 

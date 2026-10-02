@@ -13,6 +13,7 @@ import apiClient from "../../api/apiClient";
 import { useAuth } from "../../auth/useAuth";
 import { useTheme } from "../../ThemeContext";
 import { font, radius, spacing } from "../../theme";
+import { devLog } from "../../utils/devLog";
 import {
   BLE_AVAILABLE,
   buildUserCommands,
@@ -449,7 +450,7 @@ export default function BodyTrackingScreen({ navigation }) {
     const hCm = toHeightCm(p?.heightValue, p?.heightUnit);
     if (hCm < 100 || toN(p?.age) < 10) return;
     const cmd = buildUserCommand(Math.round(hCm), Math.round(toN(p.age)), p?.gender);
-    console.log("[BLE] re-sending init cmd with profile:",
+    devLog("[BLE] re-sending init cmd with profile:",
       cmd.map(b => b.toString(16).padStart(2,"0")).join(" "));
     writeInitRef.current(cmd);
   }, [userProfile]);
@@ -529,7 +530,7 @@ export default function BodyTrackingScreen({ navigation }) {
     // autoConnect (i.e. while waiting for the scale to wake up).
     function doConnect(deviceOrSaved) {
       if (!active) return;
-      console.log("[BLE] doConnect called, device:", deviceOrSaved?.id || deviceOrSaved, "active:", active);
+      devLog("[BLE] doConnect called, device:", deviceOrSaved?.id || deviceOrSaved, "active:", active);
       setScaleStatus("connecting");
 
       // Build the full 4-command init sequence (profile, device, session, heartbeat)
@@ -605,7 +606,7 @@ export default function BodyTrackingScreen({ navigation }) {
         // onError
         (err) => {
           if (!active) return;
-          console.log("[BLE] error:", err);
+          devLog("[BLE] error:", err);
           sheetOpenedRef.current = false;
           bleCleanupRef.current  = null;
           setMeasureOpen(false);
@@ -641,9 +642,9 @@ export default function BodyTrackingScreen({ navigation }) {
     // fallback internally, so the scale wakes up any time and connects itself.
     async function startAutoConnect() {
       if (!active) return;
-      console.log("[BLE] startAutoConnect, BLE_AVAILABLE:", BLE_AVAILABLE);
+      devLog("[BLE] startAutoConnect, BLE_AVAILABLE:", BLE_AVAILABLE);
       const paired = await getPairedDevice();
-      console.log("[BLE] pairedDevice from storage:", paired);
+      devLog("[BLE] pairedDevice from storage:", paired);
       if (!active) return;
       setPairedDevice(paired);
       if (!paired || !BLE_AVAILABLE) { setScaleStatus("idle"); return; }

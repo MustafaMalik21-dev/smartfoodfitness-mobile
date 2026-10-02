@@ -98,9 +98,26 @@ export function AuthProvider({ children }) {
       return next;
     }
 
-    function logout() {
+    async function logout() {
+      const token = auth && auth.token;
+
+      // Leave first, revoke after: the user is signed out on this device whatever
+      // the network does, and the screen never waits on a round-trip.
       setAuthState(null);
       clearAuth();
+
+      if (token) {
+        // clearAuth() has already emptied the cache the request interceptor reads,
+        // so the token has to be attached explicitly here.
+        apiClient
+          .post("/api/auth/logout", {}, {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 5000,
+          })
+          .catch(() => {
+            // Offline, expired token, server down — the local sign-out already happened.
+          });
+      }
     }
 
     function setAuth(next) {

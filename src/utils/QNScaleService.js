@@ -22,14 +22,15 @@
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { devLog } from "./devLog";
 
 let BleManager;
 try {
   const blePlx = require("react-native-ble-plx");
   BleManager = blePlx.BleManager;
-  console.log("[Scale] BLE loaded OK");
+  devLog("[Scale] BLE loaded OK");
 } catch (e) {
-  console.log("[Scale] BLE not available:", e?.message);
+  devLog("[Scale] BLE not available:", e?.message);
 }
 
 export const BLE_AVAILABLE = !!BleManager;
@@ -239,13 +240,13 @@ function waitForPoweredOn(m, timeoutMs = 8000) {
     const timer = setTimeout(() => {
       if (resolved) return;
       resolved = true;
-      console.log("[Scale] waitForPoweredOn TIMEOUT");
+      devLog("[Scale] waitForPoweredOn TIMEOUT");
       try { sub?.remove(); } catch {}
       resolve(false);
     }, timeoutMs);
 
     const sub = m.onStateChange((s) => {
-      console.log("[Scale] BT state:", s);
+      devLog("[Scale] BT state:", s);
       if (resolved) return;
       if (s === "PoweredOn") {
         resolved = true; clearTimeout(timer); try { sub?.remove(); } catch {} resolve(true);
@@ -296,7 +297,7 @@ export function connectAndMeasure(
   onConnected = null,
   onWriteReady = null,
 ) {
-  console.log("[Scale] connectAndMeasure called, BLE_AVAILABLE:", BLE_AVAILABLE,
+  devLog("[Scale] connectAndMeasure called, BLE_AVAILABLE:", BLE_AVAILABLE,
     "id:", deviceOrId?.id || deviceOrId);
 
   if (!BLE_AVAILABLE) { onError("BLE not available."); return () => {}; }
@@ -319,12 +320,12 @@ export function connectAndMeasure(
     if (!connected || cancelled) return;
     const b64 = bytesToBase64(cmd);
     const hex = Array.from(cmd).map(b => b.toString(16).padStart(2,"0")).join(" ");
-    console.log("[Scale] →", charUUID.slice(-4), hex);
+    devLog("[Scale] →", charUUID.slice(-4), hex);
     try {
       await connected.writeCharacteristicWithoutResponseForService(svcUUID, charUUID, b64);
-      console.log("[Scale] ✓", charUUID.slice(-4));
+      devLog("[Scale] ✓", charUUID.slice(-4));
     } catch (e) {
-      console.log("[Scale] ✗", charUUID.slice(-4), e?.message);
+      devLog("[Scale] ✗", charUUID.slice(-4), e?.message);
     }
   }
 
@@ -335,7 +336,7 @@ export function connectAndMeasure(
     if (cancelled) return;
     return setTimeout(async () => {
       if (cancelled) return;
-      console.log("[Scale] sending heartbeat");
+      devLog("[Scale] sending heartbeat");
       await writeTo(CHAR_CMD, hbCmd);
       heartbeatTimer = scheduleHeartbeat(hbCmd, 30000);
     }, delay);
@@ -348,7 +349,7 @@ export function connectAndMeasure(
 
   // ── async work ──────────────────────────────────────────────────────────────
   async function run() {
-    console.log("[Scale] run() started");
+    devLog("[Scale] run() started");
 
     const powered = await waitForPoweredOn(m, 8000);
     if (cancelled) return;
@@ -361,7 +362,7 @@ export function connectAndMeasure(
       let attempt = 0;
       while (!cancelled) {
         attempt++;
-        console.log(`[Scale] attempt ${attempt} — connecting to ${deviceId}`);
+        devLog(`[Scale] attempt ${attempt} — connecting to ${deviceId}`);
         try {
           const connectPromise = isScannedDev
             ? deviceOrId.connect({ autoConnect: false })
@@ -372,14 +373,14 @@ export function connectAndMeasure(
             new Promise((_, reject) =>
               setTimeout(() => reject(new Error("timed out after 10 s")), 10000)),
           ]);
-          console.log("[Scale] GATT connected ✓ attempt:", attempt);
+          devLog("[Scale] GATT connected ✓ attempt:", attempt);
           break;
         } catch (e) {
           connected = null;
           if (cancelled) return;
-          console.log(`[Scale] attempt ${attempt} failed: ${e?.message}`);
+          devLog(`[Scale] attempt ${attempt} failed: ${e?.message}`);
           if (isScannedDev) throw e; // fresh scan device — real error, don't loop
-          console.log("[Scale] retrying in 3 s…");
+          devLog("[Scale] retrying in 3 s…");
           await new Promise(r => { retryDelay = setTimeout(r, 3000); });
           retryDelay = null;
           if (cancelled) return;
@@ -389,7 +390,7 @@ export function connectAndMeasure(
       if (cancelled || !connected) return;
 
       // Service discovery
-      console.log("[Scale] discovering services…");
+      devLog("[Scale] discovering services…");
       await connected.discoverAllServicesAndCharacteristics();
       if (cancelled) { try { connected.cancelConnection(); } catch {} return; }
 
@@ -399,27 +400,27 @@ export function connectAndMeasure(
       let notifyUUID = CHAR_NOTIFY;
       try {
         const services = await connected.services();
-        console.log("[Scale] services:", services.map(s => s.uuid));
+        devLog("[Scale] services:", services.map(s => s.uuid));
         const s = services.find(x => x.uuid.toUpperCase().includes("FFE0"));
         if (s) {
           svcUUID = s.uuid;
           const chars = await s.characteristics();
-          console.log("[Scale] characteristics:");
-          chars.forEach(c => console.log(`  ${c.uuid} notify=${c.isNotifiable} write=${c.isWritable} writeNoResp=${c.isWritableWithoutResponse}`));
+          devLog("[Scale] characteristics:");
+          chars.forEach(c => devLog(`  ${c.uuid} notify=${c.isNotifiable} write=${c.isWritable} writeNoResp=${c.isWritableWithoutResponse}`));
           const notifyChar = chars.find(x => x.uuid.toUpperCase().includes("FFE1") && x.isNotifiable)
                           || chars.find(x => x.isNotifiable);
           if (notifyChar) {
             notifyUUID = notifyChar.uuid;
-            console.log("[Scale] notify UUID resolved:", notifyUUID);
+            devLog("[Scale] notify UUID resolved:", notifyUUID);
           }
         } else {
-          console.log("[Scale] WARNING: FFE0 service not found — using fallback UUIDs");
+          devLog("[Scale] WARNING: FFE0 service not found — using fallback UUIDs");
         }
       } catch (e) {
-        console.log("[Scale] UUID resolve error:", e?.message);
+        devLog("[Scale] UUID resolve error:", e?.message);
       }
 
-      console.log("[Scale] final UUIDs → svc:", svcUUID, "notify:", notifyUUID);
+      devLog("[Scale] final UUIDs → svc:", svcUUID, "notify:", notifyUUID);
 
       if (cancelled) { try { connected.cancelConnection(); } catch {} return; }
 
@@ -484,31 +485,31 @@ export function connectAndMeasure(
         const hbChk      = (0x1F + 0x05 + a + 0x10) & 0xFF;
         heartbeatCmdVar  = [0x1F, 0x05, a, 0x10, hbChk]; // update for new age
 
-        console.log(`[Scale] phase2 age=0x${a.toString(16)}(${a}) ` +
+        devLog(`[Scale] phase2 age=0x${a.toString(16)}(${a}) ` +
           `profile=${profileCmd.map(b=>b.toString(16).padStart(2,"0")).join(" ")}`);
         writeTo(CHAR_CMD, profileCmd)
           .then(() => { if (!cancelled) return writeTo(CHAR_CMD2, sessionCmd); });
       }
 
       // ── Subscribe to FFE2 FIRST so we don't miss the 0x21 challenge ──────────
-      console.log("[Scale] subscribing FFE2 + FFE1");
+      devLog("[Scale] subscribing FFE2 + FFE1");
       try {
         subInd = connected.monitorCharacteristicForService(svcUUID, CHAR_IND, (err, char) => {
-          if (err) { console.log("[Scale] FFE2 ind error:", err?.reason || err?.message); return; }
+          if (err) { devLog("[Scale] FFE2 ind error:", err?.reason || err?.message); return; }
           if (!char?.value) return;
           const bytes = base64ToBytes(char.value);
           const b0 = bytes[0] & 0xff;
-          console.log("[Scale] FFE2 ind:", Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join(" "));
+          devLog("[Scale] FFE2 ind:", Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join(" "));
           // 0x21 = CMD_DEVICE ACK — byte[2] is the scale's stored profile age (challenge)
           if (b0 === 0x21 && bytes.length >= 3) {
             const storedAge = bytes[2] & 0xff;
-            console.log(`[Scale] 0x21 challenge received: stored age=0x${storedAge.toString(16)} (${storedAge})`);
+            devLog(`[Scale] 0x21 challenge received: stored age=0x${storedAge.toString(16)} (${storedAge})`);
             doPhase2(storedAge);
           }
         });
-        console.log("[Scale] FFE2 subscribed");
+        devLog("[Scale] FFE2 subscribed");
       } catch (e) {
-        console.log("[Scale] FFE2 subscribe failed (non-fatal):", e?.message);
+        devLog("[Scale] FFE2 subscribe failed (non-fatal):", e?.message);
       }
 
       // ── Subscribe to FFE1 (measurement + profile-ACK notifications) ──────────
@@ -521,7 +522,7 @@ export function connectAndMeasure(
       const stab = makeStabilityTracker();
       sub = connected.monitorCharacteristicForService(svcUUID, notifyUUID, (err, char) => {
         if (err) {
-          console.log("[Scale] FFE1 error:", err?.reason || err?.message);
+          devLog("[Scale] FFE1 error:", err?.reason || err?.message);
           // (no retry timer to clear — phase2 is one-shot)
           onError(err.reason || err.message || "Read error");
           return;
@@ -530,12 +531,12 @@ export function connectAndMeasure(
 
         const bytes = base64ToBytes(char.value);
         const b0 = bytes.length ? (bytes[0] & 0xff) : 0;
-        console.log("[Scale] FFE1 raw:", Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join(" "));
+        devLog("[Scale] FFE1 raw:", Array.from(bytes).map(b => b.toString(16).padStart(2,"0")).join(" "));
 
         // 0x14 = CMD_PROFILE accepted + session started.
         // Scale is now waiting for the user to step on it.
         if (b0 === 0x14) {
-          console.log("[Scale] ✓ 0x14 session ACK — scale ready, starting heartbeat");
+          devLog("[Scale] ✓ 0x14 session ACK — scale ready, starting heartbeat");
           if (!heartbeatTimer) heartbeatTimer = scheduleHeartbeat(heartbeatCmdVar);
           return;
         }
@@ -549,7 +550,7 @@ export function connectAndMeasure(
                       parsed.packetType === 0x1C ||
                       parsed.packetType === 0x1D);
         if (inLiveMode && !wasLive) {
-          console.log("[Scale] ✓ live mode — starting heartbeat");
+          devLog("[Scale] ✓ live mode — starting heartbeat");
           if (!heartbeatTimer) heartbeatTimer = scheduleHeartbeat(heartbeatCmdVar);
         }
 
@@ -560,7 +561,7 @@ export function connectAndMeasure(
           ? parsed.hardwareStable
           : (parsed.hardwareStable || stab(parsed.weight));
 
-        console.log(`[Scale] w=${parsed.weight} stable=${isStable} hw=${parsed.hardwareStable} type=0x${parsed.packetType.toString(16)} live=${inLiveMode}`);
+        devLog(`[Scale] w=${parsed.weight} stable=${isStable} hw=${parsed.hardwareStable} type=0x${parsed.packetType.toString(16)} live=${inLiveMode}`);
         onMeasurement({
           weight:     parsed.weight,
           isStable,
@@ -571,12 +572,12 @@ export function connectAndMeasure(
       });
 
       // ── PHASE 1: Send CMD_DEVICE, then await the 0x21 challenge ─────────────
-      console.log("[Scale] phase1: sending CMD_DEVICE");
+      devLog("[Scale] phase1: sending CMD_DEVICE");
       await writeTo(CHAR_CMD2, initCmds[1]); // CMD_DEVICE → FFE4
 
       // Fallback: if no 0x21 challenge within 2 s, proceed with our own age
       phase2Timer = setTimeout(() => {
-        console.log("[Scale] no 0x21 challenge in 2 s — using app profile age");
+        devLog("[Scale] no 0x21 challenge in 2 s — using app profile age");
         doPhase2(initCmds[0][2] || 0x19); // age from original profile cmd
       }, 2000);
 
@@ -588,7 +589,7 @@ export function connectAndMeasure(
 
     } catch (e) {
       if (!cancelled) {
-        console.log("[Scale] run() error:", e?.message || e);
+        devLog("[Scale] run() error:", e?.message || e);
         onError(e?.reason || e?.message || "Could not connect to scale.");
       }
     }
@@ -597,7 +598,7 @@ export function connectAndMeasure(
   run();
 
   return () => {
-    console.log("[Scale] cleanup called");
+    devLog("[Scale] cleanup called");
     cancelled = true;
     if (retryDelay)     { clearTimeout(retryDelay);     retryDelay     = null; }
     if (heartbeatTimer) { clearTimeout(heartbeatTimer); heartbeatTimer = null; }
