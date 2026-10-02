@@ -7,13 +7,14 @@ A cross-platform food and fitness app built with React Native and Expo. Users ca
 ## 📱 Screenshots
 
 <p align="center">
-  <img src="screenshots/weight-onboarding.png" width="200" alt="Onboarding">
-  <img src="screenshots/dashboard.png" width="200" alt="Dashboard">
-  <img src="screenshots/food.png" width="200" alt="Food logging">
+  <img src="Screenshots/WeightOnboarding.png" width="200" alt="Onboarding">
+  <img src="Screenshots/Dashboard.png" width="200" alt="Dashboard">
+  <img src="Screenshots/Food.png" width="200" alt="Food logging">
 </p>
 <p align="center">
-  <img src="screenshots/fitness.png" width="200" alt="Workouts">
-  <img src="screenshots/tracking.png" width="200" alt="Progress tracking">
+  <img src="Screenshots/Fitness.png" width="200" alt="Workouts">
+  <img src="Screenshots/Tracking.png" width="200" alt="Progress tracking">
+  <img src="Screenshots/AI-Assistant.png" width="200" alt="AI reccomendations">
 </p>
 
 ## ✨ Features
